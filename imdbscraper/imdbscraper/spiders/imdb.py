@@ -1,7 +1,15 @@
 import scrapy
 import unidecode
 import re
-import logging
+import os
+import uuid
+from elasticsearch import Elasticsearch
+
+ELASTIC_API_URL_HOST = os.environ['ELASTIC_API_URL_HOST']
+ELASTIC_API_USERNAME = os.environ['ELASTIC_API_USERNAME']
+ELASTIC_API_PASSWORD = os.environ['ELASTIC_API_PASSWORD']
+es = Elasticsearch(ELASTIC_API_URL_HOST, basic_auth=(ELASTIC_API_USERNAME, ELASTIC_API_PASSWORD))
+
 
 cleanString = lambda x: '' if x is None else unidecode.unidecode(re.sub(r'\s+',' ',x))
 
@@ -57,15 +65,17 @@ class ImdbSpider(scrapy.Spider):
 
         # We save the actor's data
         for actor in actors_roles:
-            yield {   
-                
-                "movie_id": movie_id, 
-                "movie_name": movie_name, 
-                "movie_year": movie_year,
-                "actor_name": actor[0], 
-                "actor_id": actor[1], 
-                "role_name": actor[2]
-            }
+            es.index(index='imdb',
+                     id=uuid.uuid4(),
+                     body={
+                         "movie_id": movie_id,
+                         "movie_name": movie_name,
+                         "movie_year": movie_year,
+                         "actor_name": actor[0],
+                         "actor_id": actor[1],
+                         "role_name": actor[2]
+                     })
+
         # We go to one of the actors web page and use the function to parse actors
         yield scrapy.Request("https://www.imdb.com/name/" + allActorsIDs[actorIndex] + "/", callback=self.parse_actor)
 
